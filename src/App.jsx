@@ -11,18 +11,28 @@ const fmtDate = (d) =>
 
 /* ── MQTT topics ── */
 const BROKER = 'ws://broker.hivemq.com:8000/mqtt';
-const TOPIC_RELAY = 'mohith123/home/relay1';
 const TOPIC_TEMP = 'mohith123/home/room1/temperature';
 const TOPIC_HUM = 'mohith123/home/room1/humidity';
 
+// The three light topics
+const TOPIC_DOOR = 'mohith123/home/door/light';
+const TOPIC_BED = 'mohith123/home/bedroom/light';
+const TOPIC_HALL = 'mohith123/home/hall/light';
+
 export default function App() {
   const [client, setClient] = useState(null);
-  const [ledStatus, setLedStatus] = useState('OFF');
-  const [temperature, setTemperature] = useState('--');
-  const [humidity, setHumidity] = useState('--');
   const [connStatus, setConnStatus] = useState('Connecting…');
   const [clock, setClock] = useState(fmt(new Date()));
   const [today, setToday] = useState(fmtDate(new Date()));
+
+  // Environment State
+  const [temperature, setTemperature] = useState('--');
+  const [humidity, setHumidity] = useState('--');
+
+  // Independent Light States
+  const [doorStatus, setDoorStatus] = useState('OFF');
+  const [bedStatus, setBedStatus] = useState('OFF');
+  const [hallStatus, setHallStatus] = useState('OFF');
 
   /* live clock */
   useEffect(() => {
@@ -34,34 +44,49 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  /* MQTT */
+  /* MQTT Connection & Subscriptions */
   useEffect(() => {
     const c = mqtt.connect(BROKER);
+
     c.on('connect', () => {
       setConnStatus('Connected');
-      c.subscribe(TOPIC_RELAY);
       c.subscribe(TOPIC_TEMP);
       c.subscribe(TOPIC_HUM);
+      c.subscribe(TOPIC_DOOR);
+      c.subscribe(TOPIC_BED);
+      c.subscribe(TOPIC_HALL);
       setClient(c);
     });
+
     c.on('error', () => setConnStatus('Error'));
     c.on('offline', () => setConnStatus('Offline'));
+
     c.on('message', (topic, msg) => {
-      const p = msg.toString();
-      if (topic === TOPIC_RELAY) setLedStatus(p);
-      if (topic === TOPIC_TEMP) setTemperature(p);
-      if (topic === TOPIC_HUM) setHumidity(p);
+      const payload = msg.toString();
+      if (topic === TOPIC_TEMP) setTemperature(payload);
+      if (topic === TOPIC_HUM) setHumidity(payload);
+      if (topic === TOPIC_DOOR) setDoorStatus(payload);
+      if (topic === TOPIC_BED) setBedStatus(payload);
+      if (topic === TOPIC_HALL) setHallStatus(payload);
     });
+
     return () => c.end();
   }, []);
 
-  const toggle = useCallback((cmd) => {
-    if (client) { client.publish(TOPIC_RELAY, cmd); setLedStatus(cmd); }
+  /* toggle: flips current state of a light */
+  const toggleLight = useCallback((topic, currentStatus) => {
+    if (client) {
+      const cmd = currentStatus === 'ON' ? 'OFF' : 'ON';
+      client.publish(topic, cmd);
+      if (topic === TOPIC_DOOR) setDoorStatus(cmd);
+      if (topic === TOPIC_BED) setBedStatus(cmd);
+      if (topic === TOPIC_HALL) setHallStatus(cmd);
+    }
   }, [client]);
 
-  const isOn = ledStatus === 'ON';
   const isConnected = connStatus === 'Connected';
 
+  /* temperature colour band */
   const tempColor =
     temperature === '--' ? 'var(--text-3)'
       : parseFloat(temperature) > 30 ? 'var(--red)'
@@ -74,24 +99,36 @@ export default function App() {
         : parseFloat(humidity) < 30 ? 'var(--amber)'
           : 'var(--green)';
 
+  const ACTIVE_LIGHTS = [
+    { id: 'door', name: 'Front Door Light', topic: TOPIC_DOOR, status: doorStatus, icon: '🚪', channel: 'Channel 1' },
+    { id: 'bed', name: 'Bedroom Light', topic: TOPIC_BED, status: bedStatus, icon: '🛏️', channel: 'Channel 2' },
+    { id: 'hall', name: 'Hallway Light', topic: TOPIC_HALL, status: hallStatus, icon: '🛋️', channel: 'Channel 3' },
+  ];
+
+  const activeCount = ACTIVE_LIGHTS.filter(l => l.status === 'ON').length;
+
   return (
     <>
       <div className="app-bg"><div className="app-bg-grid" /></div>
 
       <div className="app-shell">
 
-        {/* ── Sidebar ── */}
+        {/* ════════ SIDEBAR ════════ */}
         <aside className="sidebar">
           <div className="sidebar-brand">
             <div className="brand-icon">🏠</div>
             <div className="brand-text">
-              <span className="brand-name">HomeOS</span>
-              <span className="brand-tagline">IoT Platform</span>
+              <span className="brand-name">NexusHome</span>
+              <span className="brand-tagline">Intelligent Home Automation</span>
             </div>
           </div>
 
-          <span className="nav-section-label">Menu</span>
-          <div className="nav-item active"><span className="nav-icon">📊</span><span>Dashboard</span><span className="nav-badge">Live</span></div>
+          <span className="nav-section-label">Navigation</span>
+          <div className="nav-item active">
+            <span className="nav-icon">📊</span>
+            <span>Dashboard</span>
+            <span className="nav-badge">Live</span>
+          </div>
           <div className="nav-item"><span className="nav-icon">💡</span><span>Devices</span></div>
           <div className="nav-item"><span className="nav-icon">📈</span><span>Analytics</span></div>
           <div className="nav-item"><span className="nav-icon">⚙️</span><span>Settings</span></div>
@@ -107,13 +144,13 @@ export default function App() {
           </div>
         </aside>
 
-        {/* ── Main ── */}
+        {/* ════════ MAIN ════════ */}
         <div className="main-content">
 
           {/* Topbar */}
           <header className="topbar">
             <div className="topbar-left">
-              <span className="topbar-title">Smart Climate Control</span>
+              <span className="topbar-title">NexusHome</span>
               <span className="topbar-sub">{today}</span>
             </div>
             <div className="topbar-right">
@@ -126,128 +163,86 @@ export default function App() {
             </div>
           </header>
 
-          {/* Body */}
+          {/* Dashboard Body */}
           <div className="dashboard-body">
 
-            {/* Stat strip */}
-            <div className="stats-row">
-              <div className="stat-card" style={{ '--stat-color': isOn ? 'var(--green)' : 'var(--text-3)', '--stat-bg': 'var(--green-dim)', '--stat-border': 'rgba(52,211,153,0.2)' }}>
-                <div className="stat-icon">💡</div>
-                <div className="stat-info">
-                  <span className="stat-value" style={{ color: isOn ? 'var(--green)' : 'var(--text-3)' }}>{ledStatus}</span>
-                  <span className="stat-label">Light · Room 1</span>
-                  <span className={`stat-trend ${isOn ? 'up' : 'neu'}`}>{isOn ? '↑ Active' : '— Standby'}</span>
-                </div>
+            {/* ── Environment ── */}
+            <div>
+              <div className="section-header" style={{ marginBottom: '0.9rem' }}>
+                <span className="section-title">Environment</span>
+                <span className="section-badge">Live Data</span>
               </div>
 
-              <div className="stat-card" style={{ '--stat-color': 'var(--amber)', '--stat-bg': 'var(--amber-dim)', '--stat-border': 'rgba(251,191,36,0.2)' }}>
-                <div className="stat-icon">🌡️</div>
-                <div className="stat-info">
-                  <span className="stat-value" style={{ color: tempColor }}>
-                    {temperature === '--' ? '--' : parseFloat(temperature).toFixed(1)}
-                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>°C</span>
-                  </span>
-                  <span className="stat-label">Temperature · Room 1</span>
-                  <span className={`stat-trend ${temperature === '--' ? 'neu' : 'up'}`}>{temperature === '--' ? '— Waiting' : '↑ Live'}</span>
-                </div>
-              </div>
+              <div className="env-card">
+                <div className="env-grid">
 
-              <div className="stat-card" style={{ '--stat-color': 'var(--cyan)', '--stat-bg': 'var(--cyan-dim)', '--stat-border': 'rgba(34,211,238,0.2)' }}>
-                <div className="stat-icon">💧</div>
-                <div className="stat-info">
-                  <span className="stat-value" style={{ color: humColor }}>
-                    {humidity === '--' ? '--' : parseFloat(humidity).toFixed(0)}
-                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>%</span>
-                  </span>
-                  <span className="stat-label">Humidity · Room 1</span>
-                  <span className={`stat-trend ${humidity === '--' ? 'neu' : 'up'}`}>{humidity === '--' ? '— Waiting' : '↑ Live'}</span>
+                  <div className="env-item" style={{ '--ei-color': 'var(--amber)' }}>
+                    <span className="env-emoji">🌡️</span>
+                    <span className="env-value" style={{ color: tempColor }}>
+                      {temperature === '--' ? '--' : `${parseFloat(temperature).toFixed(1)}°C`}
+                    </span>
+                    <span className="env-label">Temperature</span>
+                    <span className="env-sub">
+                      {temperature === '--' ? 'Awaiting data…'
+                        : parseFloat(temperature) > 30 ? '🔴 Hot'
+                          : parseFloat(temperature) < 18 ? '🔵 Cold'
+                            : '🟡 Comfortable'}
+                    </span>
+                  </div>
+
+                  <div className="env-item" style={{ '--ei-color': 'var(--cyan)' }}>
+                    <span className="env-emoji">💧</span>
+                    <span className="env-value" style={{ color: humColor }}>
+                      {humidity === '--' ? '--' : `${parseFloat(humidity).toFixed(0)}%`}
+                    </span>
+                    <span className="env-label">Humidity</span>
+                    <span className="env-sub">
+                      {humidity === '--' ? 'Awaiting data…'
+                        : parseFloat(humidity) > 70 ? '💧 High'
+                          : parseFloat(humidity) < 30 ? '🟡 Dry'
+                            : '🟢 Optimal'}
+                    </span>
+                  </div>
+
                 </div>
               </div>
             </div>
 
-            {/* Relay control */}
-            <div>
+            {/* ── Lighting Zones ── */}
+            <div style={{ marginTop: '2rem' }}>
               <div className="section-header" style={{ marginBottom: '0.9rem' }}>
-                <span className="section-title">Light Control</span>
-                <span className="section-badge">Relay · Channel 1</span>
+                <span className="section-title">Lighting Zones</span>
+                <span className="section-badge">{activeCount} Active</span>
               </div>
-              <div className={`relay-card ${isOn ? 'is-on' : ''}`}>
-                <div className="relay-icon-side">{isOn ? '💡' : '🔌'}</div>
-                <div className="relay-info">
-                  <div className="relay-chip">⚡ Live MQTT</div>
-                  <div className="relay-name">Main Room Light</div>
-                  <div className="relay-desc">Real-time relay control via HiveMQ MQTT broker</div>
-                  <div className="relay-meta">
-                    <span className="meta-pill">📡 {TOPIC_RELAY}</span>
-                    <span className="meta-pill">🌐 WS · Port 8000</span>
-                  </div>
-                </div>
-                <div className="relay-controls">
-                  <div className={`relay-state-badge ${isOn ? 'on' : 'off'}`}>
-                    <span className="relay-state-dot" />{ledStatus}
-                  </div>
-                  <div className="relay-btn-group">
-                    <button className={`relay-btn btn-on ${isOn ? 'active' : ''}`} onClick={() => toggle('ON')}>⚡ Turn ON</button>
-                    <button className={`relay-btn btn-off ${!isOn ? 'active' : ''}`} onClick={() => toggle('OFF')}>✕ Turn OFF</button>
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            {/* Sensor cards */}
-            <div>
-              <div className="section-header" style={{ marginBottom: '0.9rem' }}>
-                <span className="section-title">Live Sensors</span>
-                <span className="section-badge">{TOPIC_TEMP.split('/')[2]}</span>
-              </div>
-              <div className="sensor-row">
-
-                {/* Temperature */}
-                <div className="sensor-card">
-                  <div className="sensor-card-top">
-                    <div className="sensor-icon" style={{ background: 'var(--amber-dim)', borderColor: 'rgba(251,191,36,0.25)' }}>🌡️</div>
-                    <div className={`sensor-live-badge ${temperature !== '--' ? 'active' : ''}`}>
-                      <span className="sensor-live-dot" />
-                      {temperature !== '--' ? 'Live' : 'Waiting'}
+              <div className="devices-grid">
+                {ACTIVE_LIGHTS.map((light) => {
+                  const isOn = light.status === 'ON';
+                  return (
+                    <div key={light.id} className={`relay-card ${isOn ? 'is-on' : ''}`}>
+                      <div className="relay-icon-side">
+                        {isOn ? '💡' : light.icon}
+                      </div>
+                      <div className="relay-info">
+                        <div className="relay-chip">⚡ Live Relay</div>
+                        <div className="relay-name">{light.name}</div>
+                        <div className="relay-meta">
+                          <span className="meta-pill">🔌 {light.channel}</span>
+                          <span className="meta-pill">📡 {light.topic}</span>
+                        </div>
+                      </div>
+                      <div className="relay-controls">
+                        <button
+                          className={`relay-toggle-btn ${isOn ? 'is-on' : 'is-off'}`}
+                          onClick={() => toggleLight(light.topic, light.status)}
+                        >
+                          <span className="relay-toggle-dot" />
+                          {isOn ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="sensor-big-val" style={{ color: tempColor }}>
-                    {temperature === '--' ? '--' : parseFloat(temperature).toFixed(1)}
-                    <span className="sensor-unit">°C</span>
-                  </div>
-                  <div className="sensor-name">Temperature</div>
-                  <div className="sensor-topic">{TOPIC_TEMP}</div>
-                  <div className="sensor-band" style={{ color: tempColor }}>
-                    {temperature === '--' ? 'Awaiting data…'
-                      : parseFloat(temperature) > 30 ? '🔴 Hot'
-                        : parseFloat(temperature) < 18 ? '🔵 Cold'
-                          : '🟡 Comfortable'}
-                  </div>
-                </div>
-
-                {/* Humidity */}
-                <div className="sensor-card">
-                  <div className="sensor-card-top">
-                    <div className="sensor-icon" style={{ background: 'var(--cyan-dim)', borderColor: 'rgba(34,211,238,0.25)' }}>💧</div>
-                    <div className={`sensor-live-badge ${humidity !== '--' ? 'active' : ''}`}>
-                      <span className="sensor-live-dot" />
-                      {humidity !== '--' ? 'Live' : 'Waiting'}
-                    </div>
-                  </div>
-                  <div className="sensor-big-val" style={{ color: humColor }}>
-                    {humidity === '--' ? '--' : parseFloat(humidity).toFixed(0)}
-                    <span className="sensor-unit">%</span>
-                  </div>
-                  <div className="sensor-name">Humidity</div>
-                  <div className="sensor-topic">{TOPIC_HUM}</div>
-                  <div className="sensor-band" style={{ color: humColor }}>
-                    {humidity === '--' ? 'Awaiting data…'
-                      : parseFloat(humidity) > 70 ? '� High'
-                        : parseFloat(humidity) < 30 ? '🟡 Dry'
-                          : '🟢 Optimal'}
-                  </div>
-                </div>
-
+                  );
+                })}
               </div>
             </div>
 

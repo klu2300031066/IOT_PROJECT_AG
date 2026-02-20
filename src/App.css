@@ -848,6 +848,83 @@ body {
   color: #fff;
 }
 
+/* ── Single Toggle Button ── */
+.relay-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 1.4rem;
+  border-radius: var(--radius-sm);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.25s var(--ease);
+  position: relative;
+  overflow: hidden;
+}
+
+.relay-toggle-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.1) 50%, transparent 60%);
+  transform: translateX(-100%);
+  transition: transform 0.5s ease;
+}
+
+.relay-toggle-btn:hover::before {
+  transform: translateX(100%);
+}
+
+.relay-toggle-btn:active {
+  transform: scale(0.96);
+}
+
+.relay-toggle-btn.is-on {
+  background: linear-gradient(135deg, #059669, #34d399);
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #fff;
+  box-shadow: 0 0 22px var(--green-glow), 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.relay-toggle-btn.is-on:hover {
+  box-shadow: 0 0 36px var(--green-glow), 0 6px 24px rgba(0, 0, 0, 0.35);
+  transform: translateY(-1px);
+}
+
+.relay-toggle-btn.is-off {
+  background: var(--surface-2);
+  border-color: var(--border-2);
+  color: var(--text-3);
+}
+
+.relay-toggle-btn.is-off:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-2);
+  border-color: var(--border-2);
+}
+
+.relay-toggle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.relay-toggle-btn.is-on .relay-toggle-dot {
+  background: #fff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+  animation: blinkDot 1.8s ease-in-out infinite;
+}
+
+.relay-toggle-btn.is-off .relay-toggle-dot {
+  background: var(--text-3);
+}
+
 /* ── Sensor cards ── */
 .sensor-row {
   display: grid;
@@ -974,6 +1051,143 @@ body {
   font-size: 0.78rem;
   font-weight: 600;
   margin-top: 0.6rem;
+}
+
+/* ── Environment Card ── */
+.env-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.6rem 2rem;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s var(--ease);
+}
+
+.env-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 15%;
+  right: 15%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--purple-bright), transparent);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.env-card:hover {
+  background: var(--surface-2);
+  border-color: var(--border-2);
+}
+
+.env-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.env-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1.4rem 1rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s var(--ease);
+}
+
+.env-item::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--ei-color, var(--purple-bright));
+  opacity: 0.5;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.env-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-2);
+  transform: translateY(-2px);
+}
+
+.env-emoji {
+  font-size: 2rem;
+  filter: drop-shadow(0 0 8px var(--ei-color, var(--purple-bright)));
+}
+
+.env-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-shadow: 0 0 30px currentColor;
+  transition: color 0.4s ease;
+}
+
+.env-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-top: 0.1rem;
+}
+
+.env-sub {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-top: 0.1rem;
+}
+
+/* ── Devices Grid (3-column for light relay cards) ── */
+.devices-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.devices-grid .relay-card {
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1.4rem;
+  gap: 1rem;
+}
+
+.devices-grid .relay-icon-side {
+  width: 56px;
+  height: 56px;
+  font-size: 1.8rem;
+  border-radius: 16px;
+}
+
+.devices-grid .relay-name {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.devices-grid .relay-controls {
+  align-items: flex-start;
+  width: 100%;
+}
+
+.devices-grid .relay-btn-group {
+  width: 100%;
+}
+
+.devices-grid .relay-toggle-btn {
+  width: 100%;
+  justify-content: center;
 }
 
 /* ── Responsive ── */
